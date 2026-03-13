@@ -4,6 +4,7 @@ from gemini_client import GeminiLiveSession
 import asyncio
 import json
 import uvicorn
+import os
 
 app = FastAPI()
 
@@ -81,4 +82,5 @@ async def websocket_endpoint(websocket: WebSocket):
 
 if __name__ == "__main__":
     # FIXED: passed host and port as keyword arguments
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", 8080))
+    uvicorn.run(app, host="0.0.0.0", port=port)
