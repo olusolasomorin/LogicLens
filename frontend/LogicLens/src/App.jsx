@@ -19,7 +19,7 @@ export default function App() {
   const activeSourcesRef = useRef([]); 
 
   useEffect(() => {
-    wsRef.current = new WebSocket('ws://127.0.0.1:8000/ws/tutor');
+    wsRef.current = new WebSocket('https://my-uvicorn-backend-982983046376.us-west1.run.app/ws/tutor');
     
     wsRef.current.onopen = () => {
       console.log('Connected to LogicLens Backend');
