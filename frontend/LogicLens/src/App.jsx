@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bot, Video, Power, Mic, MicOff, Activity, SwitchCamera } from 'lucide-react'; // 🛠️ NEW: Added SwitchCamera icon
+import { Bot, Video, Power, Mic, MicOff, Activity, SwitchCamera } from 'lucide-react';
 
 export default function App() {
   const [isConnected, setIsConnected] = useState(false);
@@ -7,7 +7,7 @@ export default function App() {
   const [isUserSpeaking, setIsUserSpeaking] = useState(false);
   const [isAiSpeaking, setIsAiSpeaking] = useState(false); 
   const [mediaStream, setMediaStream] = useState(null); 
-  const [facingMode, setFacingMode] = useState("user"); // 🛠️ NEW: Track which camera is active
+  const [facingMode, setFacingMode] = useState("user"); 
   
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -70,7 +70,7 @@ export default function App() {
   const startMedia = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: facingMode }, // 🛠️ UPDATED: Use dynamic state
+        video: { facingMode: facingMode }, 
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
@@ -168,38 +168,34 @@ export default function App() {
     }
   };
 
-  // 🛠️ NEW: Safe Camera Switching Logic
   const toggleCamera = async () => {
     if (!mediaStream) return;
     
-    // Toggle the target facing mode
     const newFacingMode = facingMode === "user" ? "environment" : "user";
-    setFacingMode(newFacingMode);
 
     try {
-      // 1. Request ONLY a new video track, ignoring audio
-      const newStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: newFacingMode }
+      const newVideoStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: newFacingMode } }
       });
-      const newVideoTrack = newStream.getVideoTracks()[0];
+      const newVideoTrack = newVideoStream.getVideoTracks()[0];
 
-      // 2. Find and stop the old video track so the camera light turns off
+      const currentAudioTrack = mediaStream.getAudioTracks()[0];
+
       const oldVideoTrack = mediaStream.getVideoTracks()[0];
       if (oldVideoTrack) {
         oldVideoTrack.stop();
-        mediaStream.removeTrack(oldVideoTrack);
       }
 
-      // 3. Inject the new video track into the existing stream
-      mediaStream.addTrack(newVideoTrack);
+      const newCombinedStream = new MediaStream([newVideoTrack, currentAudioTrack]);
 
-      // 4. Force the video element to refresh
+      setMediaStream(newCombinedStream);
+      setFacingMode(newFacingMode);
+      
       if (videoRef.current) {
-        videoRef.current.srcObject = mediaStream;
+        videoRef.current.srcObject = newCombinedStream;
       }
     } catch (err) {
       console.error("Error switching camera:", err);
-      setFacingMode(facingMode); // Revert state if the user denies permission
     }
   };
 
@@ -287,7 +283,7 @@ export default function App() {
       <header className="px-6 py-4 flex items-center justify-between bg-gray-900 border-b border-gray-800">
         <div className="flex items-center gap-3">
           <Bot className="text-blue-500" size={28} />
-          <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+          <h1 className="text-xl font-bold bg-linear-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
             LogicLens
           </h1>
         </div>
@@ -339,7 +335,6 @@ export default function App() {
                 playsInline 
                 muted 
                 className="w-full h-full object-cover transition-transform duration-300" 
-                // 🛠️ UPDATED: Only mirror the front-facing camera. Back camera must remain un-mirrored to read text!
                 style={{ transform: facingMode === "user" ? "scaleX(-1)" : "none" }} 
               />
               
@@ -353,7 +348,7 @@ export default function App() {
                 <span className="text-sm font-medium text-gray-200">You</span>
               </div>
 
-              {/* 🛠️ NEW: Switch Camera Button */}
+              {/* 🛠️ Switch Camera Button */}
               <button
                 onClick={toggleCamera}
                 className="absolute top-4 right-4 bg-black/60 backdrop-blur-md p-3 rounded-xl text-white hover:bg-black/80 hover:text-blue-400 transition-all active:scale-95 border border-gray-700/50 shadow-lg z-10"
