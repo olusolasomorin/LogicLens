@@ -423,6 +423,7 @@ export default function App() {
   const [isAiSpeaking, setIsAiSpeaking] = useState(false); 
   const [mediaStream, setMediaStream] = useState(null); 
   const [facingMode, setFacingMode] = useState("user"); 
+  const [isMuted, setIsMuted] = useState(false); // 🛠️ NEW: Mute state tracker
   
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -482,11 +483,10 @@ export default function App() {
     }
   };
 
-  // 🛠️ CHANGED 1: Accept the target camera as an argument
   const startMedia = async (targetFacingMode = facingMode) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: targetFacingMode }, // 🛠️ Updated to use argument
+        video: { facingMode: targetFacingMode }, 
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
@@ -494,6 +494,11 @@ export default function App() {
         } 
       });
       
+      // 🛠️ NEW: If the user was muted before a camera switch, keep them muted!
+      if (isMuted) {
+        stream.getAudioTracks()[0].enabled = false;
+      }
+
       setMediaStream(stream); 
 
       const AudioContext = window.AudioContext || window.webkitAudioContext;
@@ -584,7 +589,6 @@ export default function App() {
     }
   };
 
-  // 🛠️ CHANGED 2: The "Nuclear Option" Camera Switcher (Now with Quick-Draw)
   const toggleCamera = async () => {
     if (!mediaStream) return;
     
@@ -604,18 +608,27 @@ export default function App() {
 
       await startMedia(newFacingMode);
       
-      // 🛠️ THE FIX: Force an immediate frame capture!
-      // We wait 800ms so the physical camera lens has time to auto-focus and adjust lighting
+      // 🛠️ RE-ADDED: The quick-draw fix to prevent AI lag!
       setTimeout(() => {
         captureAndSendFrame();
       }, 800);
       
-      // Restart the normal 2-second loop for all future frames
       streamIntervalRef.current = setInterval(captureAndSendFrame, 2000);
       
     } catch (err) {
       console.error("Nuclear switch failed:", err);
       alert("Camera switch failed. Please restart the session.");
+    }
+  };
+
+  // 🛠️ NEW: Safe Mute Toggle Logic
+  const toggleMute = () => {
+    if (mediaStream) {
+      const audioTrack = mediaStream.getAudioTracks()[0];
+      if (audioTrack) {
+        audioTrack.enabled = !audioTrack.enabled; // Silences the track without destroying it
+        setIsMuted(!audioTrack.enabled);
+      }
     }
   };
 
@@ -660,24 +673,20 @@ export default function App() {
     nextPlayTimeRef.current += audioBuffer.duration;
   };
 
-  // 🛠️ CHANGED 3: Scale down the video frames before sending to backend
   const captureAndSendFrame = () => {
     if (!videoRef.current || !canvasRef.current || wsRef.current?.readyState !== WebSocket.OPEN) return;
 
     const canvas = canvasRef.current;
     const context = canvas.getContext('2d');
     
-    // Scale down logic to prevent backend crashes
     const MAX_WIDTH = 640; 
     const scale = MAX_WIDTH / videoRef.current.videoWidth;
     
     canvas.width = MAX_WIDTH;
     canvas.height = videoRef.current.videoHeight * scale;
     
-    // Draw the resized image onto the canvas
     context.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
     
-    // Convert the small image to base64
     const base64Image = canvas.toDataURL('image/jpeg', 0.5).split(',')[1];
     
     wsRef.current.send(JSON.stringify({
@@ -700,6 +709,7 @@ export default function App() {
       setIsStreaming(false);
       setIsUserSpeaking(false);
       setIsAiSpeaking(false);
+      setIsMuted(false); // 🛠️ NEW: Reset mute state when hanging up
     } else {
       startMedia();
       streamIntervalRef.current = setInterval(captureAndSendFrame, 2000);
@@ -768,17 +778,26 @@ export default function App() {
                 style={{ transform: facingMode === "user" ? "scaleX(-1)" : "none" }} 
               />
               
-              {/* User Label & Activity Indicator */}
-              <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md px-4 py-2 rounded-xl flex items-center gap-3 border border-gray-700/50">
-                {isUserSpeaking ? (
+              {/* 🛠️ NEW: Interactive Mute Button Overlay */}
+              <button
+                onClick={toggleMute}
+                className={`absolute top-4 left-4 backdrop-blur-md px-4 py-2 rounded-xl flex items-center gap-3 border transition-all active:scale-95 shadow-lg z-10 ${
+                  isMuted ? 'bg-red-900/60 border-red-700/50' : 'bg-black/60 border-gray-700/50 hover:bg-black/80'
+                }`}
+                title={isMuted ? "Unmute Microphone" : "Mute Microphone"}
+              >
+                {isMuted ? (
+                  <MicOff size={18} className="text-red-400" />
+                ) : isUserSpeaking ? (
                   <Activity size={18} className="text-green-400 animate-pulse" />
                 ) : (
                   <Mic size={18} className="text-gray-400" />
                 )}
-                <span className="text-sm font-medium text-gray-200">You</span>
-              </div>
+                <span className={`text-sm font-medium ${isMuted ? 'text-red-200' : 'text-gray-200'}`}>
+                  {isMuted ? 'Muted' : 'You'}
+                </span>
+              </button>
 
-              {/* 🛠️ Switch Camera Button */}
               <button
                 onClick={toggleCamera}
                 className="absolute top-4 right-4 bg-black/60 backdrop-blur-md p-3 rounded-xl text-white hover:bg-black/80 hover:text-blue-400 transition-all active:scale-95 border border-gray-700/50 shadow-lg z-10"
