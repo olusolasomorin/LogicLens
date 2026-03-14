@@ -441,7 +441,7 @@ export default function App() {
   const [facingMode, setFacingMode] = useState("user"); 
   const [isMuted, setIsMuted] = useState(false); 
   
-  // 🛠️ NEW: Chat Transcript State
+  // Chat Transcript State
   const [messages, setMessages] = useState([]);
   const [showChat, setShowChat] = useState(false);
   const messagesEndRef = useRef(null);
@@ -451,9 +451,9 @@ export default function App() {
   const wsRef = useRef(null);
   const streamIntervalRef = useRef(null);
   
-  // 🛠️ NEW: Speech Recognition Ref
+  // Speech Recognition Ref
   const recognitionRef = useRef(null);
-  const isStreamingRef = useRef(false); // Used to auto-restart speech recognition
+  const isStreamingRef = useRef(false); 
 
   // Audio Refs
   const audioContextRef = useRef(null);
@@ -485,17 +485,14 @@ export default function App() {
       if (message.type === 'audio_response') {
         playAudioChunk(message.data);
       } 
-      // 🛠️ NEW: Catch AI Text and stream it into the chat box
       else if (message.type === 'text_response') {
         setMessages(prev => {
           const lastMsg = prev[prev.length - 1];
           if (lastMsg && lastMsg.role === 'ai') {
-            // Append to current AI message chunk
             const newMessages = [...prev];
             newMessages[newMessages.length - 1].text += message.data;
             return newMessages;
           } else {
-            // Start a new AI message
             return [...prev, { role: 'ai', text: message.data }];
           }
         });
@@ -527,6 +524,43 @@ export default function App() {
     }
   };
 
+  // 🛠️ NEW: Bulletproof Speech Recognition setup
+  const setupSpeechRecognition = () => {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) return; // Ignore if browser doesn't support it
+
+    if (!recognitionRef.current) {
+      recognitionRef.current = new SpeechRecognition();
+      recognitionRef.current.continuous = true;
+      recognitionRef.current.interimResults = false;
+      
+      recognitionRef.current.onresult = (event) => {
+        let finalTranscript = "";
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            finalTranscript += event.results[i][0].transcript;
+          }
+        }
+        if (finalTranscript.trim()) {
+          setMessages(prev => [...prev, { role: 'user', text: finalTranscript.trim() }]);
+        }
+      };
+      
+      // Auto-restart if it drops, but ONLY if we are still actively in a session
+      recognitionRef.current.onend = () => {
+        if (isStreamingRef.current) {
+          try { recognitionRef.current.start(); } catch(e){}
+        }
+      };
+    }
+
+    try {
+      recognitionRef.current.start();
+    } catch (e) {
+      // It's already running, safely ignore
+    }
+  };
+
   const startMedia = async (targetFacingMode = facingMode) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -544,27 +578,8 @@ export default function App() {
 
       setMediaStream(stream); 
 
-      // 🛠️ NEW: Initialize Browser Speech-to-Text for the Student's voice
-      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-      if (SpeechRecognition) {
-        recognitionRef.current = new SpeechRecognition();
-        recognitionRef.current.continuous = true;
-        recognitionRef.current.interimResults = false;
-        
-        recognitionRef.current.onresult = (event) => {
-          const transcript = event.results[event.results.length - 1][0].transcript;
-          setMessages(prev => [...prev, { role: 'user', text: transcript }]);
-        };
-        
-        // Auto-restart if it pauses due to silence
-        recognitionRef.current.onend = () => {
-          if (isStreamingRef.current) {
-            try { recognitionRef.current.start(); } catch(e){}
-          }
-        };
-        
-        recognitionRef.current.start();
-      }
+      // Initialize the new robust speech recognition
+      setupSpeechRecognition();
 
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       audioContextRef.current = new AudioContext({ sampleRate: 16000 });
@@ -660,10 +675,7 @@ export default function App() {
       if (audioWorkletNodeRef.current) audioWorkletNodeRef.current.disconnect();
       mediaStream.getTracks().forEach(track => track.stop());
       
-      // 🛠️ NEW: Temporarily stop recognition during camera switch
-      if (recognitionRef.current) {
-        recognitionRef.current.stop();
-      }
+      // Notice we DO NOT stop recognitionRef here anymore! It stays alive to hear you while the camera flips.
 
       stopAudioPlayback(); 
       setMediaStream(null);
@@ -753,6 +765,7 @@ export default function App() {
       if (audioWorkletNodeRef.current) audioWorkletNodeRef.current.disconnect();
       if (mediaStream) mediaStream.getTracks().forEach(track => track.stop());
       
+      // Stop listening when we hang up
       if (recognitionRef.current) {
         recognitionRef.current.stop();
       }
@@ -763,9 +776,9 @@ export default function App() {
       setIsUserSpeaking(false);
       setIsAiSpeaking(false);
       setIsMuted(false); 
-      setShowChat(false); // Hide chat when session ends
+      setShowChat(false); 
     } else {
-      setMessages([]); // Clear old messages
+      setMessages([]); 
       startMedia();
       streamIntervalRef.current = setInterval(captureAndSendFrame, 2000);
       setIsStreaming(true);
@@ -777,7 +790,7 @@ export default function App() {
       <header className="px-6 py-4 flex items-center justify-between bg-gray-900 border-b border-gray-800">
         <div className="flex items-center gap-3">
           <Bot className="text-blue-500" size={28} />
-          <h1 className="text-xl font-bold bg-linear-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+          <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
             LogicLens
           </h1>
         </div>
@@ -812,7 +825,6 @@ export default function App() {
         ) : (
           <div className="w-full h-full flex flex-col gap-4 relative">
             
-            {/* 🛠️ NEW: Chat Overlay Toggle Button */}
             <button
               onClick={() => setShowChat(!showChat)}
               className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-blue-600/90 hover:bg-blue-500 backdrop-blur-md px-5 py-2.5 rounded-full text-white flex items-center gap-2 shadow-lg transition-all active:scale-95 border border-blue-400/50"
@@ -821,7 +833,6 @@ export default function App() {
               <span className="text-sm font-bold tracking-wide">Transcript</span>
             </button>
 
-            {/* 🛠️ NEW: The Chat Transcript Overlay */}
             {showChat && (
               <div className="absolute inset-0 z-50 bg-gray-950/95 backdrop-blur-xl flex flex-col rounded-3xl overflow-hidden border border-gray-800 animate-in fade-in zoom-in-95 duration-200">
                 <div className="flex justify-between items-center p-4 border-b border-gray-800 bg-gray-900/50">
@@ -833,19 +844,20 @@ export default function App() {
                   </button>
                 </div>
                 
-                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {/* 🛠️ UPDATED: Added w-full and space-y-6 to force perfect alignment */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-6">
                   {messages.length === 0 ? (
                     <p className="text-center text-gray-500 mt-10 italic">Start speaking to see the transcript...</p>
                   ) : (
                     messages.map((msg, idx) => (
-                      <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                      <div key={idx} className={`w-full flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
                         <span className={`text-xs font-semibold mb-1 px-1 ${msg.role === 'user' ? 'text-gray-400' : 'text-blue-400'}`}>
                           {msg.role === 'user' ? 'You' : 'Nova'}
                         </span>
                         <div className={`max-w-[85%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed ${
                           msg.role === 'user' 
-                            ? 'bg-gray-800 text-gray-100 rounded-tr-none' 
-                            : 'bg-blue-900/30 border border-blue-800/50 text-blue-50 rounded-tl-none'
+                            ? 'bg-gray-700 text-gray-100 rounded-tr-none shadow-md' 
+                            : 'bg-blue-900/30 border border-blue-800/50 text-blue-50 rounded-tl-none shadow-md'
                         }`}>
                           {msg.text}
                         </div>
@@ -883,7 +895,7 @@ export default function App() {
                 </div>
               </div>
               <p className={`mt-6 font-medium tracking-wide transition-opacity duration-300 ${isAiSpeaking ? 'text-blue-400' : 'text-gray-500'}`}>
-                {isAiSpeaking ? 'Nova is speaking...' : 'Listening...'}
+                {isAiSpeaking ? 'Lora is speaking...' : 'Listening...'}
               </p>
               <button onClick={toggleTutoring} className="mt-8 mb-6 bg-red-600/90 hover:bg-red-500 p-4 rounded-full shadow-lg hover:shadow-red-600/50 transition-all hover:-translate-y-1 backdrop-blur-sm">
                 <Power size={28} className="text-white" />
