@@ -49,30 +49,13 @@ async def websocket_endpoint(websocket: WebSocket):
         except Exception as e:
             print(f"Error receiving from client: {e}")
 
-    # async def send_to_client():
-    #     try:
-    #         async for audio_chunk in gemini_session.receive_audio_stream():
-    #             await websocket.send_text(json.dumps({
-    #                 "type": "audio_response",  
-    #                 "data": audio_chunk 
-    #             }))
-    #     except Exception as e:
-    #         print(f"Error sending to client: {e}")
-
     async def send_to_client():
         try:
-            async for chunk in gemini_session.receive_audio_stream():
-                # 🛠️ UPDATED: Route text and audio to the frontend separately
-                if isinstance(chunk, dict) and chunk.get("type") == "text":
-                    await websocket.send_text(json.dumps({
-                        "type": "text_response",
-                        "data": chunk["data"]
-                    }))
-                else:
-                    await websocket.send_text(json.dumps({
-                        "type": "audio_response",  
-                        "data": chunk.get("data") if isinstance(chunk, dict) else chunk
-                    }))
+            async for audio_chunk in gemini_session.receive_audio_stream():
+                await websocket.send_text(json.dumps({
+                    "type": "audio_response",  
+                    "data": audio_chunk 
+                }))
         except Exception as e:
             print(f"Error sending to client: {e}")
 

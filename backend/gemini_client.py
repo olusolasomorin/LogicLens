@@ -236,18 +236,17 @@ class GeminiLiveSession:
                 response = await self.ws.recv()
                 data = json.loads(response)
 
+                # 🛠️ NEW: Intercept tool calls before checking for audio!
                 if "toolCall" in data:
                     await self.handle_tool_call(data["toolCall"])
-                    continue 
+                    continue # Tool calls do not contain audio chunks, so skip the rest of the loop
 
-                # 🛠️ UPDATED: Yield both Text AND Audio chunks
+                # Extract the audio chunks from the server content
                 if "serverContent" in data and "modelTurn" in data["serverContent"]:
                     parts = data["serverContent"]["modelTurn"]["parts"]
                     for part in parts:
-                        if "text" in part:
-                            yield {"type": "text", "data": part["text"]}
-                        elif "inlineData" in part:
-                            yield {"type": "audio", "data": part["inlineData"]["data"]}
+                        if "inlineData" in part:
+                            yield part["inlineData"]["data"]  # Yield the base64 audio to send to the frontend
 
         except websockets.exceptions.ConnectionClosed:
             print("WebSocket connection closed.")
