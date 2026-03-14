@@ -168,58 +168,48 @@ export default function App() {
     }
   };
 
-  // 🛠️ NEW: Mobile-Safe Camera Switching Logic
-  // 🛠️ NEW: Bulletproof Mobile Camera Switcher
+  // 🛠️ NEW: The "Nuke and Rebuild" Mobile Camera Switcher
   const toggleCamera = async () => {
     if (!mediaStream) return;
     
-    // Toggle the target facing mode
     const newFacingMode = facingMode === "user" ? "environment" : "user";
-    const oldVideoTrack = mediaStream.getVideoTracks()[0];
-    const currentAudioTrack = mediaStream.getAudioTracks()[0];
 
     try {
-      let newVideoStream;
-      
-      try {
-        // Attempt 1: Try to force the new camera open seamlessly
-        newVideoStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: { exact: newFacingMode } } 
-        });
-      } catch (err) {
-        // Attempt 2: Android Hardware Lock detected! 
-        // We must stop the old camera, WAIT for Android to release it, and try again.
-        if (oldVideoTrack) {
-          oldVideoTrack.stop();
-        }
-        
-        // Wait 500ms for the phone's hardware to catch up
-        await new Promise(resolve => setTimeout(resolve, 500)); 
-        
-        // Try again with looser constraints
-        newVideoStream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: newFacingMode } 
-        });
+      // 1. NUKE THE VIDEO PLAYER'S GRIP
+      // Completely unhook the stream from the video element so Android knows it's safe to close
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.srcObject = null;
       }
 
+      // 2. EXTRACT AUDIO AND KILL THE OLD CAMERA
+      const currentAudioTrack = mediaStream.getAudioTracks()[0];
+      const oldVideoTrack = mediaStream.getVideoTracks()[0];
+      
+      if (oldVideoTrack) {
+        oldVideoTrack.stop(); 
+      }
+
+      // 3. WAIT FOR THE HARDWARE LOCK TO CLEAR
+      // Half a second is the sweet spot for Android to physically power down the camera lens
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // 4. REQUEST THE NEW CAMERA
+      const newVideoStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: newFacingMode } 
+      });
       const newVideoTrack = newVideoStream.getVideoTracks()[0];
 
-      // Make sure the old track is definitely stopped so the green light goes off
-      if (oldVideoTrack && oldVideoTrack.readyState === 'live') {
-        oldVideoTrack.stop();
-      }
-
-      // Package the new video and the uninterrupted audio together
+      // 5. REBUILD THE STREAM
       const newCombinedStream = new MediaStream([newVideoTrack, currentAudioTrack]);
-      
-      // Update the React state
+
+      // 6. UPDATE STATE AND REATTACH TO THE PLAYER
       setMediaStream(newCombinedStream);
       setFacingMode(newFacingMode);
       
-      // Inject into the player and force it to play
       if (videoRef.current) {
         videoRef.current.srcObject = newCombinedStream;
-        await videoRef.current.play();
+        await videoRef.current.play(); // Force it to resume playing
       }
     } catch (err) {
       console.error("Camera switch error:", err);
