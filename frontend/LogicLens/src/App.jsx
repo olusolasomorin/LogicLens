@@ -168,34 +168,45 @@ export default function App() {
     }
   };
 
+  // 🛠️ NEW: Mobile-Safe Camera Switching Logic
   const toggleCamera = async () => {
     if (!mediaStream) return;
     
+    // Toggle the target facing mode
     const newFacingMode = facingMode === "user" ? "environment" : "user";
 
     try {
+      // 1. EXTRACT AUDIO & STOP OLD VIDEO FIRST
+      // 🛑 We MUST stop the current camera before requesting the new one to release the mobile hardware lock!
+      const currentAudioTrack = mediaStream.getAudioTracks()[0];
+      const oldVideoTrack = mediaStream.getVideoTracks()[0];
+      
+      if (oldVideoTrack) {
+        oldVideoTrack.stop(); 
+      }
+
+      // 2. NOW request the new camera since the hardware is free
       const newVideoStream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: { ideal: newFacingMode } }
+        video: { facingMode: newFacingMode } // Removed "ideal:" as it confuses iOS
       });
       const newVideoTrack = newVideoStream.getVideoTracks()[0];
 
-      const currentAudioTrack = mediaStream.getAudioTracks()[0];
-
-      const oldVideoTrack = mediaStream.getVideoTracks()[0];
-      if (oldVideoTrack) {
-        oldVideoTrack.stop();
-      }
-
+      // 3. Package into a brand new stream with the uninterrupted audio
       const newCombinedStream = new MediaStream([newVideoTrack, currentAudioTrack]);
 
+      // 4. Update React state
       setMediaStream(newCombinedStream);
       setFacingMode(newFacingMode);
       
+      // 5. Inject into the player and FORCE it to play (Crucial for mobile!)
       if (videoRef.current) {
         videoRef.current.srcObject = newCombinedStream;
+        await videoRef.current.play(); 
       }
     } catch (err) {
       console.error("Error switching camera:", err);
+      // Optional: Add a small alert so you know if the OS blocked it
+      alert("Could not switch camera. Check browser permissions.");
     }
   };
 
