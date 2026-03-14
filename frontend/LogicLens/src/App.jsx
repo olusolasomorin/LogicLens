@@ -584,31 +584,33 @@ export default function App() {
     }
   };
 
-  // 🛠️ CHANGED 2: The "Nuclear Option" Camera Switcher
+  // 🛠️ CHANGED 2: The "Nuclear Option" Camera Switcher (Now with Quick-Draw)
   const toggleCamera = async () => {
     if (!mediaStream) return;
     
-    // 1. Determine the new camera
     const newFacingMode = facingMode === "user" ? "environment" : "user";
-    setFacingMode(newFacingMode); // Update UI state for mirroring
+    setFacingMode(newFacingMode);
 
     try {
-      // 2. ABSOLUTE DESTRUCTION: Kill the entire session
       clearInterval(streamIntervalRef.current);
       if (audioWorkletNodeRef.current) {
         audioWorkletNodeRef.current.disconnect();
       }
-      mediaStream.getTracks().forEach(track => track.stop()); // Kills mic AND camera
+      mediaStream.getTracks().forEach(track => track.stop());
       stopAudioPlayback(); 
       setMediaStream(null);
 
-      // 3. Give Android 200ms to completely flush all hardware locks
       await new Promise(resolve => setTimeout(resolve, 200));
 
-      // 4. REBIRTH: Start the entire session over with the new camera
       await startMedia(newFacingMode);
       
-      // 5. Restart the video frame loop
+      // 🛠️ THE FIX: Force an immediate frame capture!
+      // We wait 800ms so the physical camera lens has time to auto-focus and adjust lighting
+      setTimeout(() => {
+        captureAndSendFrame();
+      }, 800);
+      
+      // Restart the normal 2-second loop for all future frames
       streamIntervalRef.current = setInterval(captureAndSendFrame, 2000);
       
     } catch (err) {
