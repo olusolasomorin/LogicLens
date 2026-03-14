@@ -1,11 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Bot, Video, Power, Mic, MicOff, Activity } from 'lucide-react';
+import { Bot, Video, Power, Mic, MicOff, Activity, SwitchCamera } from 'lucide-react'; // 🛠️ NEW: Added SwitchCamera icon
 
 export default function App() {
   const [isConnected, setIsConnected] = useState(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isUserSpeaking, setIsUserSpeaking] = useState(false);
-  const [isAiSpeaking, setIsAiSpeaking] = useState(false); // 🛠️ New state to track AI talking
+  const [isAiSpeaking, setIsAiSpeaking] = useState(false); 
+  const [mediaStream, setMediaStream] = useState(null); 
+  const [facingMode, setFacingMode] = useState("user"); // 🛠️ NEW: Track which camera is active
   
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
@@ -42,6 +44,12 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    if (videoRef.current && mediaStream) {
+      videoRef.current.srcObject = mediaStream;
+    }
+  }, [videoRef.current, mediaStream]);
+
   const stopAudioPlayback = () => {
     activeSourcesRef.current.forEach(source => {
       try {
@@ -52,7 +60,7 @@ export default function App() {
       }
     });
     activeSourcesRef.current = [];
-    setIsAiSpeaking(false); // 🛠️ Turn off AI talking indicator
+    setIsAiSpeaking(false); 
     
     if (audioContextRef.current) {
       nextPlayTimeRef.current = audioContextRef.current.currentTime;
@@ -62,7 +70,7 @@ export default function App() {
   const startMedia = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: "user" }, // Better for video call style
+        video: { facingMode: facingMode }, // 🛠️ UPDATED: Use dynamic state
         audio: {
           echoCancellation: true,
           noiseSuppression: true,
@@ -70,9 +78,7 @@ export default function App() {
         } 
       });
       
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-      }
+      setMediaStream(stream); 
 
       const AudioContext = window.AudioContext || window.webkitAudioContext;
       audioContextRef.current = new AudioContext({ sampleRate: 16000 });
@@ -88,7 +94,7 @@ export default function App() {
 
           process(inputs, outputs, parameters) {
             const input = inputs[0];
-            if (input.length > 0) {
+            if (input && input.length > 0) {
               const float32Data = input[0];
               const pcm16Data = new Int16Array(float32Data.length);
               let maxAmplitude = 0;
@@ -162,6 +168,41 @@ export default function App() {
     }
   };
 
+  // 🛠️ NEW: Safe Camera Switching Logic
+  const toggleCamera = async () => {
+    if (!mediaStream) return;
+    
+    // Toggle the target facing mode
+    const newFacingMode = facingMode === "user" ? "environment" : "user";
+    setFacingMode(newFacingMode);
+
+    try {
+      // 1. Request ONLY a new video track, ignoring audio
+      const newStream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: newFacingMode }
+      });
+      const newVideoTrack = newStream.getVideoTracks()[0];
+
+      // 2. Find and stop the old video track so the camera light turns off
+      const oldVideoTrack = mediaStream.getVideoTracks()[0];
+      if (oldVideoTrack) {
+        oldVideoTrack.stop();
+        mediaStream.removeTrack(oldVideoTrack);
+      }
+
+      // 3. Inject the new video track into the existing stream
+      mediaStream.addTrack(newVideoTrack);
+
+      // 4. Force the video element to refresh
+      if (videoRef.current) {
+        videoRef.current.srcObject = mediaStream;
+      }
+    } catch (err) {
+      console.error("Error switching camera:", err);
+      setFacingMode(facingMode); // Revert state if the user denies permission
+    }
+  };
+
   const playAudioChunk = (base64Audio) => {
     if (!audioContextRef.current) return;
 
@@ -186,11 +227,10 @@ export default function App() {
     source.connect(audioContextRef.current.destination);
 
     activeSourcesRef.current.push(source);
-    setIsAiSpeaking(true); // 🛠️ AI started speaking
+    setIsAiSpeaking(true); 
 
     source.onended = () => {
       activeSourcesRef.current = activeSourcesRef.current.filter(s => s !== source);
-      // 🛠️ Check if queue is empty to turn off speaking indicator
       if (activeSourcesRef.current.length === 0) {
         setIsAiSpeaking(false); 
       }
@@ -226,10 +266,11 @@ export default function App() {
       if (audioWorkletNodeRef.current) {
         audioWorkletNodeRef.current.disconnect();
       }
-      if (videoRef.current?.srcObject) {
-         videoRef.current.srcObject.getTracks().forEach(track => track.stop());
+      if (mediaStream) {
+         mediaStream.getTracks().forEach(track => track.stop());
       }
       stopAudioPlayback(); 
+      setMediaStream(null); 
       setIsStreaming(false);
       setIsUserSpeaking(false);
       setIsAiSpeaking(false);
@@ -246,7 +287,7 @@ export default function App() {
       <header className="px-6 py-4 flex items-center justify-between bg-gray-900 border-b border-gray-800">
         <div className="flex items-center gap-3">
           <Bot className="text-blue-500" size={28} />
-          <h1 className="text-xl font-bold bg-linear-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
+          <h1 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">
             LogicLens
           </h1>
         </div>
@@ -259,14 +300,6 @@ export default function App() {
       {/* MAIN CONTENT */}
       <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 w-full max-w-5xl mx-auto h-[calc(100vh-80px)]">
         
-        {/* WE ALWAYS RENDER THE VIDEO TAG (Hidden if not streaming to avoid ref issues) */}
-        <video 
-          ref={videoRef} 
-          autoPlay 
-          playsInline 
-          muted 
-          className={`${isStreaming ? 'hidden' : 'hidden'}`} // Controlled in the split layout below
-        />
         <canvas ref={canvasRef} className="hidden" />
 
         {!isStreaming ? (
@@ -305,8 +338,9 @@ export default function App() {
                 autoPlay 
                 playsInline 
                 muted 
-                className="w-full h-full object-cover mirror" // 'mirror' class can be added to CSS if you want it flipped like a selfie cam
-                style={{ transform: "scaleX(-1)" }} 
+                className="w-full h-full object-cover transition-transform duration-300" 
+                // 🛠️ UPDATED: Only mirror the front-facing camera. Back camera must remain un-mirrored to read text!
+                style={{ transform: facingMode === "user" ? "scaleX(-1)" : "none" }} 
               />
               
               {/* User Label & Activity Indicator */}
@@ -318,14 +352,21 @@ export default function App() {
                 )}
                 <span className="text-sm font-medium text-gray-200">You</span>
               </div>
+
+              {/* 🛠️ NEW: Switch Camera Button */}
+              <button
+                onClick={toggleCamera}
+                className="absolute top-4 right-4 bg-black/60 backdrop-blur-md p-3 rounded-xl text-white hover:bg-black/80 hover:text-blue-400 transition-all active:scale-95 border border-gray-700/50 shadow-lg z-10"
+                title="Switch Camera"
+              >
+                <SwitchCamera size={22} />
+              </button>
             </div>
 
             {/* LOWER VIEW: AI AVATAR */}
             <div className="flex-1 relative bg-gray-900 rounded-3xl overflow-hidden border border-gray-800 shadow-xl flex flex-col items-center justify-center min-h-[40%]">
               
-              {/* AI Visualizer Container */}
               <div className="relative flex items-center justify-center w-36 h-36">
-                {/* Expanding pulse rings when speaking */}
                 {isAiSpeaking && (
                   <>
                     <div className="absolute inset-0 rounded-full bg-blue-500/20 animate-[ping_1.5s_cubic-bezier(0,0,0.2,1)_infinite]"></div>
@@ -333,18 +374,15 @@ export default function App() {
                   </>
                 )}
                 
-                {/* Main AI Avatar Bubble */}
                 <div className={`relative z-10 flex items-center justify-center w-32 h-32 rounded-full border-2 transition-all duration-300 ${isAiSpeaking ? 'bg-gray-800 border-blue-400 shadow-[0_0_40px_rgba(59,130,246,0.3)]' : 'bg-gray-800/50 border-gray-700'}`}>
                    <Bot size={56} className={`transition-colors duration-300 ${isAiSpeaking ? 'text-blue-400' : 'text-gray-500'}`} />
                 </div>
               </div>
 
-              {/* Status Text */}
               <p className={`mt-6 font-medium tracking-wide transition-opacity duration-300 ${isAiSpeaking ? 'text-blue-400' : 'text-gray-500'}`}>
                 {isAiSpeaking ? 'AI is speaking...' : 'Listening...'}
               </p>
 
-              {/* End Call Button */}
               <button 
                 onClick={toggleTutoring}
                 className="mt-8 mb-6 bg-red-600/90 hover:bg-red-500 p-4 rounded-full shadow-lg hover:shadow-red-600/50 transition-all hover:-translate-y-1 backdrop-blur-sm"
