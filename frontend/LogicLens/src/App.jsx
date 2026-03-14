@@ -409,7 +409,7 @@ export default function App() {
               </div>
 
               <p className={`mt-6 font-medium tracking-wide transition-opacity duration-300 ${isAiSpeaking ? 'text-blue-400' : 'text-gray-500'}`}>
-                {isAiSpeaking ? 'AI is speaking...' : 'Listening...'}
+                {isAiSpeaking ? 'Lora is Speaking...' : 'Lora is Listening...'}
               </p>
 
               <button 
