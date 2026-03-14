@@ -192,7 +192,7 @@ export default function App() {
 
       // 3. WAIT FOR THE HARDWARE LOCK TO CLEAR
       // Half a second is the sweet spot for Android to physically power down the camera lens
-      await new Promise(resolve => setTimeout(resolve, 500));
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       // 4. REQUEST THE NEW CAMERA
       const newVideoStream = await navigator.mediaDevices.getUserMedia({
