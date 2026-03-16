@@ -65,3 +65,59 @@ Click the **Start Session** button on the home screen. The interactive split-scr
 * **Switch Cameras:** Tap the **Switch Camera** icon (top right of your video feed) to seamlessly flip to your phone's rear camera and point it down at your notebook or desk.
 * **Mute Microphone:** Need a moment to think? Tap the **You / Muted** badge (top left of your video feed) to temporarily pause your microphone without disconnecting the session. Tap it again to resume speaking.
 * **End Session:** When you are done learning, tap the red **Power** button below Lora's avatar to safely close the connection and turn off your camera.
+
+## 🚀 Installation & Local Setup
+To run LogicLens locally on your machine, you will need to start both the Python backend and the React frontend.
+
+### Prerequisites
+Node.js installed
+
+Python 3.9+ installed
+
+A Google Gemini API Key from Google AI Studio
+
+**1. Backend Setup**
+Open a terminal and navigate to your backend folder:
+#### Clone the repository
+git clone [https://github.com/olusolasomorin/LogicLens.git](https://github.com/olusolasomorin/LogicLens.git)
+
+cd LogicLens/backend
+
+#### Create a virtual environment
+python -m venv venv
+
+#### Activate the virtual environment
+**On Windows:**
+venv\Scripts\activate
+**On Mac/Linux:**
+source venv/bin/activate
+
+#### Install the required dependencies
+pip install fastapi uvicorn websockets python-dotenv
+
+#### Create a .env file in the root of your backend folder and add your Gemini API key:
+GEMINI_API_KEY=your_gemini_api_key_here
+
+#### Start the FastAPI server:
+uvicorn main:app --host 0.0.0.0 --port 8080 --reload
+
+**2. Frontend Setup**
+Open a new terminal window and navigate to your frontend folder:
+cd LogicLens/frontend
+
+#### Install dependencies
+npm install
+
+*Important:* If running locally, open src/App.jsx and change the BACKEND_URL variable inside the useEffect hook to point to your local Python server:
+
+const BACKEND_URL = 'ws://localhost:8080/ws/tutor';
+
+#### Start the React development server:
+npm run dev
+
+**3. Start Learning**
+Open your browser to the local React address (usually http://localhost:5173).
+
+Grant camera and microphone permissions.
+
+Click Start Session, hold up a math problem, and say "Hi Lora!"
