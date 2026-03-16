@@ -45,7 +45,7 @@ graph TD
     class F,G,H backend;
     class I ai;
 
-    ## 🚀 How to Use LogicLens
+## 🚀 How to Use LogicLens
 
 LogicLens is fully deployed and accessible directly in your web browser. No local installation or downloading is required!
 
