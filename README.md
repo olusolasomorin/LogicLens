@@ -44,6 +44,7 @@ graph TD
     class A,B,C,D,E frontend;
     class F,G,H backend;
     class I ai;
+```
 
 ## 🚀 How to Use LogicLens
 
