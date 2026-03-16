@@ -9,7 +9,7 @@ LogicLens bridges the gap between pure educational pedagogy and generative AI. P
 * **Socratic Teaching Engine:** Strictly prompted to guide students step-by-step rather than outputting the final answer.
 * **Smart Frame Downscaling:** A custom Canvas API interceptor that dynamically shrinks 4K smartphone camera frames to 640px, preventing backend memory crashes.
 * **Voice Activity Detection (VAD):** A custom browser `AudioWorklet` that monitors microphone input to smoothly handle human-AI interruptions.
-* **Backend Python Calculator:** Because LLMs can hallucinate arithmetic, Nova is equipped with a secure Python function-calling tool. She intercepts complex math, evaluates it perfectly on the server, and speaks the accurate result.
+* **Backend Python Calculator:** Because LLMs can hallucinate arithmetic, Lora is equipped with a secure Python function-calling tool. She intercepts complex math, evaluates it perfectly on the server, and speaks the accurate result.
 * **Mobile-Safe Camera Switching:** A "Nuke and Rebuild" hardware toggle that safely swaps between front and rear lenses without triggering Android OS abort errors.
 
 ## 🏗️ Architecture
@@ -57,11 +57,11 @@ Visit the application here: **https://logiclens-omega.vercel.app/**
 When prompted by your browser, **Allow** access to your camera and microphone. LogicLens requires these to see your math problems and hear your questions in real-time. All processing is handled securely, and streams are not recorded.
 
 ### 3. Start the Session
-Click the **Start Session** button on the home screen. The interactive split-screen UI will load, showing your camera feed on top and Nova's AI avatar on the bottom.
+Click the **Start Session** button on the home screen. The interactive split-screen UI will load, showing your camera feed on top and Lora's AI avatar on the bottom.
 
-### 4. Interact with Nova
-* **Ask a Question:** Simply start speaking naturally. Try saying, *"Hi Nova, I need help factoring a quadratic equation."*
+### 4. Interact with Lora
+* **Ask a Question:** Simply start speaking naturally. Try saying, *"Hi Lora, I need help factoring a quadratic equation."*
 * **Show Your Work:** Write a math problem in dark marker on a piece of paper and hold it up to the camera.
 * **Switch Cameras:** Tap the **Switch Camera** icon (top right of your video feed) to seamlessly flip to your phone's rear camera and point it down at your notebook or desk.
 * **Mute Microphone:** Need a moment to think? Tap the **You / Muted** badge (top left of your video feed) to temporarily pause your microphone without disconnecting the session. Tap it again to resume speaking.
-* **End Session:** When you are done learning, tap the red **Power** button below Nova's avatar to safely close the connection and turn off your camera.
+* **End Session:** When you are done learning, tap the red **Power** button below Lora's avatar to safely close the connection and turn off your camera.
